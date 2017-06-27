@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+
+#circle circle {
+  fill: none;
+  pointer-events: all;
+}
+
+.group path {
+  fill-opacity: .5;
+}
+
+path.chord {
+  stroke: #000;
+  stroke-width: .25px;
+}
+
+#circle:hover path.fade {
+  display: none;
+}
+</style>
+<body>
+<div style="text-align:center;">
+<svg id='flow', display=block, margin=auto></svg>
+</div>
+<script src="d3.v3.min.js"></script>
+<script>
+var width = 650,
+    height = 650;
+    outerRadius = Math.min(width, height) / 2 - 150,
+    innerRadius = outerRadius - 25;
+
+var formatPercent = d3.format(".1%");
+
+var arc = d3.svg.arc()
+    .innerRadius(innerRadius)
+    .outerRadius(outerRadius);
+
+var layout = d3.layout.chord()
+    .padding(.04)
+    .sortSubgroups(d3.descending)
+    .sortChords(d3.ascending);
+
+var path = d3.svg.chord()
+    .radius(innerRadius);
+
+var svg = d3.select("#flow")
+    .attr("width", width+50)
+    .attr("height", height+50)
+    .append("g")
+    .attr("id", "circle")
+    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+svg.append("circle")
+    .attr("r", outerRadius)
+    .attr("fill", "black");
+    
+d3.csv("regions_colors_all.csv", function(regions) {
+    d3.json("adjacency_matrix_all.json", function(matrix) {
+        
+            // Compute the chord layout.
+            layout.matrix(matrix);
+
+            // Add a group per neighborhood.
+            var group = svg.selectAll(".group")
+                .data(layout.groups)
+                .enter().append("g")
+                .attr("class", "group")
+                .on("mouseover", mouseover);
+
+
+            // Add a mouseover title.
+            group.append("title").text(function(d, i) {
+                return regions[i].Names ;
+             });
+
+            // Add the group arc.
+            var groupPath = group.append("path")
+                .attr("id", function(d, i) { return "group" + i; })
+                .attr("d", arc)
+                .style("fill", function(d, i) { return regions[i].color; });
+
+            // Add a text label.
+            var groupText = group.append("text")
+                .each(function(d) { d.angle = (d.startAngle + d.endAngle) / 2; })
+                .attr("dy", ".35em")
+                .attr("font-size",12)
+                .attr("transform", function(d) {
+                    return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")"
+                        + "translate(" + (innerRadius + 26) + ")"
+                        + (d.angle > Math.PI ? "rotate(180)" : "");
+                 })
+                 .style("text-anchor", function(d) { return d.angle > Math.PI ? "end" : null; })
+                 .text(function(d, i) { return regions[i].Names;  });
+
+
+            // Add the chords.
+            var chord = svg.selectAll(".chord")
+                .data(layout.chords)
+                .enter().append("path")
+                .attr("class", "chord")
+                .style("fill", function(d) { return regions[d.source.index].color; })
+                .attr("d", path);
+
+            // Add an elaborate mouseover title for each chord.
+            chord.append("title").text(function(d) {
+                 return regions[d.source.index].Names
+                 + " → " + regions[d.target.index].Names
+                 + ": " + d.source.value
+                 + "\n" + regions[d.target.index].Names
+                 + " → " + regions[d.source.index].Names
+                 + ": " + d.target.value;
+                 });
+
+            function mouseover(d, i) {
+                chord.classed("fade", function(p) {
+                return p.source.index != i
+                && p.target.index != i;
+                });
+            }
+
+    });
+});
+</script>
+</body>
